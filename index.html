@@ -113,15 +113,36 @@
       .catch(function(){ return FALLBACK; });
   }
 
+  // 探活：家里那台机器开着才放行，关着就明说
+  function alive(base){
+    return new Promise(function(resolve){
+      var done = false;
+      var ac = ("AbortController" in window) ? new AbortController() : null;
+      var timer = setTimeout(function(){
+        if(done) return;
+        done = true;
+        if(ac) try{ ac.abort(); }catch(e){}
+        resolve(false);
+      }, 5000);
+      fetch(base.replace(/\/+$/,"") + "/api/ping?_=" + Date.now(), ac ? {cache:"no-store", signal:ac.signal} : {cache:"no-store"})
+        .then(function(r){ return r.ok; })
+        .then(function(ok){ if(done) return; done = true; clearTimeout(timer); resolve(ok); })
+        .catch(function(){ if(done) return; done = true; clearTimeout(timer); resolve(false); });
+    });
+  }
+
   function start(){
     show("loading");
     currentURL().then(function(base){
       if(!base){ show("dead"); return; }
-      var c = getCode();
-      if(c){ jump(base, c); return; }
-      show("gate");
-      setTimeout(function(){ $("#code").focus(); }, 120);
-    });
+      return alive(base).then(function(ok){
+        if(!ok){ show("dead"); return; }
+        var c = getCode();
+        if(c){ jump(base, c); return; }
+        show("gate");
+        setTimeout(function(){ $("#code").focus(); }, 120);
+      });
+    }).catch(function(){ show("dead"); });
   }
 
   $("#go").onclick = function(){
