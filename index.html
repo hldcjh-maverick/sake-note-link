@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
+<meta name="theme-color" content="#f6f3ec">
+<title>清酒手帖 · 入口</title>
+<style>
+  :root{
+    --paper:#f6f3ec; --ink:#22201c; --ink2:#6b6459; --ink3:#a49b8d;
+    --line:#e0d8c8; --line2:#d3c9b6; --shu:#a8322a;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0;height:100%}
+  body{
+    background:var(--paper); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    display:flex; align-items:center; justify-content:center;
+    padding:32px; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{width:100%;max-width:330px;text-align:center}
+  .seal{
+    width:56px;height:56px;border-radius:8px;background:var(--shu);color:#fff;
+    display:grid;place-items:center;margin:0 auto 22px;
+    font-family:Georgia,"Songti SC","Noto Serif CJK SC",serif;
+    font-size:26px;font-weight:600;
+  }
+  h1{
+    font-family:Georgia,"Songti SC","Noto Serif CJK SC",serif;
+    font-size:21px;font-weight:600;letter-spacing:.04em;margin:0 0 8px;
+  }
+  .desc{font-size:13px;color:var(--ink3);line-height:1.7;margin:0 0 26px}
+  input{
+    width:100%;height:52px;border:1px solid var(--line2);border-radius:12px;background:#fff;
+    text-align:center;font-size:24px;letter-spacing:.42em;text-indent:.42em;
+    font-variant-numeric:tabular-nums;color:var(--ink);outline:none;font-family:inherit;
+    transition:border-color .18s ease;
+  }
+  input:focus{border-color:var(--ink)}
+  input::placeholder{letter-spacing:.1em;text-indent:0;font-size:14px;color:var(--ink3)}
+  button{
+    width:100%;height:50px;border:none;border-radius:12px;background:var(--ink);color:var(--paper);
+    font-size:15px;font-weight:600;margin-top:16px;font-family:inherit;cursor:pointer;
+    transition:opacity .18s ease;
+  }
+  button:disabled{opacity:.5}
+  .err{font-size:12.5px;color:var(--shu);height:18px;margin-top:12px}
+  .spin{
+    width:26px;height:26px;border:2px solid var(--line2);border-top-color:var(--shu);
+    border-radius:50%;margin:0 auto 18px;animation:sp .8s linear infinite;
+  }
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .hide{display:none}
+  .foot{
+    position:fixed;bottom:22px;left:0;right:0;text-align:center;
+    font-size:11px;color:var(--ink3);letter-spacing:.08em;
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div id="loading">
+    <div class="spin"></div>
+    <div class="desc" style="margin-bottom:0">正在打开…</div>
+  </div>
+
+  <div id="gate" class="hide">
+    <div class="seal">酒</div>
+    <h1>清酒手帖</h1>
+    <p class="desc">输一次访问码，之后这台手机会记住</p>
+    <input id="code" type="tel" inputmode="numeric" maxlength="6" placeholder="六位访问码" autocomplete="off">
+    <button id="go">进去</button>
+    <div class="err" id="err"></div>
+  </div>
+
+  <div id="dead" class="hide">
+    <div class="seal" style="background:#a49b8d">酒</div>
+    <h1>暂时打不开</h1>
+    <p class="desc">家里那台 Mac mini 可能关机了<br>或者网络断了，过会再试</p>
+    <button id="retry" style="background:#fff;color:var(--ink);border:1px solid var(--line2)">重试</button>
+  </div>
+</div>
+
+<div class="foot">清酒手帖 · SAKE NOTE</div>
+
+<script>
+(function(){
+  var FALLBACK = "https://ocean-rats-investments-postcard.trycloudflare.com";
+  var KEY = "sake.link.code";
+  var $ = function(s){ return document.querySelector(s); };
+
+  function show(id){
+    ["loading","gate","dead"].forEach(function(k){
+      $("#"+k).classList.toggle("hide", k !== id);
+    });
+  }
+
+  function getCode(){ try{ return localStorage.getItem(KEY) || ""; }catch(e){ return ""; } }
+  function setCode(c){ try{ localStorage.setItem(KEY, c); }catch(e){} }
+  function clearCode(){ try{ localStorage.removeItem(KEY); }catch(e){} }
+
+  function jump(base, code){
+    var u = base.replace(/\/+$/,"") + (code ? "/?k=" + encodeURIComponent(code) : "/");
+    location.replace(u);
+  }
+
+  // 拿当前隧道地址
+  function currentURL(){
+    return fetch("link.json?_=" + Date.now(), {cache:"no-store"})
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(d){ return (d && d.url) ? d.url : FALLBACK; })
+      .catch(function(){ return FALLBACK; });
+  }
+
+  function start(){
+    show("loading");
+    currentURL().then(function(base){
+      if(!base){ show("dead"); return; }
+      var c = getCode();
+      if(c){ jump(base, c); return; }
+      show("gate");
+      setTimeout(function(){ $("#code").focus(); }, 120);
+    });
+  }
+
+  $("#go").onclick = function(){
+    var v = ($("#code").value || "").trim();
+    if(v.length < 4){ $("#err").textContent = "访问码是 6 位数字"; return; }
+    $("#go").disabled = true; $("#go").textContent = "打开中…";
+    currentURL().then(function(base){
+      setCode(v);
+      jump(base, v);
+    }).catch(function(){
+      $("#err").textContent = "连不上，稍后再试";
+      $("#go").disabled = false; $("#go").textContent = "进去";
+    });
+  };
+
+  $("#code").addEventListener("input", function(e){
+    e.target.value = e.target.value.replace(/\D/g,"");
+  });
+  $("#code").addEventListener("keydown", function(e){
+    if(e.key === "Enter") $("#go").click();
+  });
+  $("#retry").onclick = function(){ start(); };
+
+  start();
+})();
+</script>
+</body>
+</html>
